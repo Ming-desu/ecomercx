@@ -45,6 +45,8 @@ export const users = createTable("user", (d) => ({
 			withTimezone: true,
 		})
 		.$defaultFn(() => /* @__PURE__ */ new Date()),
+
+	passwordHash: d.text(),
 	image: d.varchar({ length: 255 }),
 }));
 

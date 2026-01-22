@@ -1,12 +1,13 @@
 import type { Config } from "drizzle-kit";
 
-import { env } from "@/env";
+import { serverEnv } from "@/env/serverEnv";
 
 export default {
 	schema: "./src/server/db/schema.ts",
 	dialect: "postgresql",
 	dbCredentials: {
-		url: env.DATABASE_URL,
+		url: serverEnv.DATABASE_URL,
 	},
 	tablesFilter: ["ecomercx_*"],
+	casing: "snake_case",
 } satisfies Config;
