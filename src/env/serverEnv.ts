@@ -1,5 +1,5 @@
-import dotenv from "dotenv";
 import dotenvExpand from "dotenv-expand";
+import dotenv from "dotenv-flow";
 import { cleanEnv, host, num, str, url } from "envalid";
 
 const loadedEnv = dotenv.config();
