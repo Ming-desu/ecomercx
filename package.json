@@ -25,6 +25,7 @@
 	},
 	"dependencies": {
 		"@auth/drizzle-adapter": "^1.7.2",
+		"@biomejs/cli-win32-x64": "^2.3.12",
 		"@hookform/resolvers": "^5.2.2",
 		"@radix-ui/react-avatar": "^1.1.11",
 		"@radix-ui/react-collapsible": "^1.1.12",
