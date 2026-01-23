@@ -1,8 +1,10 @@
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
-import { createTRPCFactory } from "./trpc-core";
+import type { TRPCBaseContext } from "./trpc-core";
 
-export const createTRPCContext = async (opts: { headers: Headers }) => {
+export const createTRPCContext = async (opts: {
+	headers: Headers;
+}): Promise<TRPCBaseContext> => {
 	const session = await auth();
 
 	return {
@@ -11,13 +13,3 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
 		...opts,
 	};
 };
-
-const trpc = createTRPCFactory();
-
-export const {
-	createTRPCRouter,
-	publicProcedure,
-	protectedProcedure,
-	createCallerFactory,
-	t,
-} = trpc;

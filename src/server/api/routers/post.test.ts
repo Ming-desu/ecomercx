@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { db } from "@/server/db";
-import { createTRPCFactory, type TRPCBaseContext } from "../trpc-core";
+import { createCallerFactory, type TRPCBaseContext } from "../trpc-core";
 import { postRouter } from "./post";
-
-const trpc = createTRPCFactory();
 
 const ctx: TRPCBaseContext = {
 	db,
@@ -14,7 +12,7 @@ const ctx: TRPCBaseContext = {
 describe("postRouter", () => {
 	describe("hello procedure", () => {
 		it("should return a greeting with the input text", async () => {
-			const caller = trpc.createCallerFactory(postRouter)(ctx);
+			const caller = createCallerFactory(postRouter)(ctx);
 
 			const result = await caller.hello({ text: "World" });
 
