@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import argon2 from "argon2";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { DefaultSession, NextAuthConfig } from "next-auth";
+import type { Adapter } from "next-auth/adapters";
 import { encode as defaultEncode } from "next-auth/jwt";
 import CredentialsProvider from "next-auth/providers/credentials";
 import z from "zod";
@@ -10,7 +11,10 @@ import { serverEnv } from "@/env/serverEnv";
 import { db } from "@/server/db";
 import {
 	accounts,
+	rolePermissions,
 	sessions,
+	userPermissions,
+	userRoles,
 	users,
 	verificationTokens,
 } from "@/server/db/schema";
@@ -25,23 +29,77 @@ declare module "next-auth" {
 	interface Session extends DefaultSession {
 		user: {
 			id: string;
-			// ...other properties
-			// role: UserRole;
+			roles: string[];
+			permissions: string[];
 		} & DefaultSession["user"];
 	}
-
-	// interface User {
-	//   // ...other properties
-	//   // role: UserRole;
-	// }
 }
 
-const adapter = DrizzleAdapter(db, {
+const baseAdapter = DrizzleAdapter(db, {
 	usersTable: users,
 	accountsTable: accounts,
 	sessionsTable: sessions,
 	verificationTokensTable: verificationTokens,
 });
+
+const adapter: Adapter = {
+	...baseAdapter,
+	getSessionAndUser: async (sessionToken) => {
+		const res = await baseAdapter.getSessionAndUser?.(sessionToken);
+		if (!res) return null;
+
+		// biome-ignore lint/suspicious/noExplicitAny: cannot augment
+		delete (res.user as any).passwordHash;
+
+		const userId = res.user.id;
+
+		const roleRows = await db.query.userRoles.findMany({
+			where: eq(userRoles.userId, userId),
+			with: {
+				role: true,
+			},
+		});
+
+		const roleNames = roleRows.map((x) => x.role.name);
+
+		const roleIds = roleRows.map((x) => x.roleId);
+
+		const rolePermRows =
+			roleIds.length === 0
+				? []
+				: await db.query.rolePermissions.findMany({
+						where: inArray(rolePermissions.roleId, roleIds),
+						with: {
+							permission: true,
+						},
+					});
+
+		const userPermRows = await db.query.userPermissions.findMany({
+			where: eq(userPermissions.userId, userId),
+			with: {
+				permission: true,
+			},
+		});
+
+		const permissionNames = Array.from(
+			new Set([
+				...rolePermRows.map((rp) => rp.permission.name),
+				...userPermRows.map((up) => up.permission.name),
+			]),
+		);
+
+		return {
+			session: res.session,
+			user: {
+				...res.user,
+
+				// attach RBAC data
+				roles: roleNames,
+				permissions: permissionNames,
+			},
+		};
+	},
+};
 
 export const authConfig = {
 	secret: serverEnv.AUTH_SECRET,
@@ -99,13 +157,19 @@ export const authConfig = {
 
 			return token;
 		},
-		session: ({ session, user }) => ({
-			...session,
-			user: {
-				...session.user,
-				id: user.id,
-			},
-		}),
+		session: ({ session, user }) => {
+			return {
+				...session,
+				user: {
+					...session.user,
+					id: user.id,
+					// biome-ignore lint/suspicious/noExplicitAny: cannot augment
+					roles: (user as any)?.roles ?? [],
+					// biome-ignore lint/suspicious/noExplicitAny: cannot augment
+					permissions: (user as any)?.permissions ?? [],
+				},
+			};
+		},
 	},
 	jwt: {
 		encode: async (params) => {

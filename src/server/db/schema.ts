@@ -245,7 +245,7 @@ export const userRolesRelations = relations(userRoles, ({ one }) => ({
 		fields: [userRoles.userId],
 		references: [users.id],
 	}),
-	roleId: one(roles, {
+	role: one(roles, {
 		fields: [userRoles.roleId],
 		references: [roles.id],
 	}),
