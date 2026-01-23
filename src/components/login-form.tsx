@@ -24,10 +24,15 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { LoginSchema, type LoginSchemaType } from "@/validators/auth";
 
+type LoginFormProps = {
+	redirectTo?: string;
+} & React.ComponentProps<"div">;
+
 export function LoginForm({
 	className,
+	redirectTo = "/",
 	...props
-}: React.ComponentProps<"div">) {
+}: LoginFormProps) {
 	const router = useRouter();
 
 	const form = useForm<LoginSchemaType>({
@@ -42,7 +47,7 @@ export function LoginForm({
 		const res = await signIn("credentials", {
 			...values,
 			redirect: false,
-			redirectTo: "/",
+			redirectTo,
 		});
 
 		if (res?.error) {

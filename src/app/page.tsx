@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { LatestPost } from "@/app/_components/post";
+import { Logout } from "@/components/logout";
 import { auth } from "@/server/auth";
 import { api, HydrateClient } from "@/trpc/server";
 
@@ -52,12 +53,21 @@ export default async function Home() {
 							<p className="text-center text-2xl text-white">
 								{session && <span>Logged in as {session.user?.name}</span>}
 							</p>
-							<Link
-								className="rounded-full bg-white/10 px-10 py-3 font-semibold no-underline transition hover:bg-white/20"
-								href={session ? "/auth/logout" : "/auth/login"}
-							>
-								{session ? "Sign out" : "Sign in"}
-							</Link>
+							{session ? (
+								<Logout
+									className="cursor-pointer rounded-full bg-white/10 px-10 py-3 font-semibold no-underline transition hover:bg-white/20"
+									redirectTo="/auth/login"
+								>
+									Sign out
+								</Logout>
+							) : (
+								<Link
+									className="rounded-full bg-white/10 px-10 py-3 font-semibold no-underline transition hover:bg-white/20"
+									href="/auth/login"
+								>
+									Sign in
+								</Link>
+							)}
 						</div>
 					</div>
 

@@ -25,6 +25,7 @@ import {
 	SidebarMenuItem,
 	useSidebar,
 } from "@/components/ui/sidebar";
+import { Logout } from "./logout";
 
 export function NavUser({
 	user,
@@ -98,10 +99,16 @@ export function NavUser({
 							</DropdownMenuItem>
 						</DropdownMenuGroup>
 						<DropdownMenuSeparator />
-						<DropdownMenuItem>
-							<LogOut />
-							Log out
-						</DropdownMenuItem>
+						<Logout
+							asChild
+							className="cursor-pointer"
+							redirectTo="/admin/auth/login"
+						>
+							<DropdownMenuItem>
+								<LogOut />
+								Log out
+							</DropdownMenuItem>
+						</Logout>
 					</DropdownMenuContent>
 				</DropdownMenu>
 			</SidebarMenuItem>

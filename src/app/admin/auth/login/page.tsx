@@ -15,7 +15,7 @@ export default function LoginPage() {
 					</div>
 					Acme Inc.
 				</Link>
-				<LoginForm />
+				<LoginForm redirectTo="/admin" />
 			</div>
 		</div>
 	);
