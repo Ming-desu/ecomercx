@@ -18,8 +18,8 @@ import {
 } from "@/app/actions/products";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CategoryFilter } from "@/components/category-filter";
+import { PermissionGate } from "@/components/permission-gate";
 import { Badge } from "@/components/ui/badge";
-
 import {
 	Breadcrumb,
 	BreadcrumbItem,
@@ -62,18 +62,34 @@ export default async function Page({
 }) {
 	const { category, q, sort, order } = await searchParams;
 
-	const sortField = sort || "createdAt";
-	const sortOrder = order === "asc" ? asc : desc;
+	// --- FIX: Logic to safely map string to Column ---
+	const getSortColumn = (field?: string) => {
+		switch (field) {
+			case "price":
+				return products.price;
+			case "stock":
+				return products.stock;
+			case "salesCount":
+				return products.salesCount;
+			case "name":
+			default:
+				return products.name;
+		}
+	};
+
+	const sortOrderFn = order === "asc" ? asc : desc;
+	const orderByColumn = getSortColumn(sort);
 
 	const inventory = await db.query.products.findMany({
-		where: (products, { and, ilike, eq }) => {
+		where: (table, { and, ilike, eq }) => {
 			const conditions = [];
 			if (category && category !== "all")
-				conditions.push(eq(products.category, category));
-			if (q) conditions.push(ilike(products.name, `%${q}%`));
+				conditions.push(eq(table.category, category));
+			if (q) conditions.push(ilike(table.name, `%${q}%`));
 			return and(...conditions);
 		},
-		orderBy: [sortOrder((products as any)[sortField])],
+		// FIX: Invoke the order function on the column
+		orderBy: [sortOrderFn(orderByColumn)],
 	});
 
 	const totalRevenue = inventory.reduce(
@@ -93,6 +109,7 @@ export default async function Page({
 		});
 		return `?${params.toString()}`;
 	};
+
 	const uniqueCategories = await db
 		.select({ category: products.category })
 		.from(products)
@@ -100,7 +117,7 @@ export default async function Page({
 
 	const categories = [
 		"all",
-		...uniqueCategories.map((c) => c.category).filter(Boolean),
+		...(uniqueCategories.map((c) => c.category).filter(Boolean) as string[]),
 	];
 
 	return (
@@ -114,7 +131,7 @@ export default async function Page({
 						<Breadcrumb>
 							<BreadcrumbList>
 								<BreadcrumbItem>
-									<BreadcrumbLink href="/dashboard">E-comercx</BreadcrumbLink>
+									<BreadcrumbLink href="/dashboard">E-commerce</BreadcrumbLink>
 								</BreadcrumbItem>
 								<BreadcrumbSeparator />
 								<BreadcrumbItem>
@@ -270,13 +287,13 @@ export default async function Page({
 										</tr>
 									</thead>
 									<tbody className="divide-y divide-slate-100">
-										{inventory.map((item, index) => (
+										{inventory.map((item, idx) => (
 											<motion.tr
 												animate={{ opacity: 1, x: 0 }}
 												className="group transition-all duration-200 hover:bg-blue-50/30"
 												initial={{ opacity: 0, x: -5 }}
 												key={item.id}
-												transition={{ delay: index * 0.05 }}
+												transition={{ delay: idx * 0.05 }}
 											>
 												<td className="p-6 font-bold text-slate-900">
 													{item.name}
@@ -312,7 +329,6 @@ export default async function Page({
 												</td>
 												<td className="p-6 text-right">
 													<div className="flex justify-end gap-2">
-														{/* EDIT */}
 														<Dialog>
 															<DialogTrigger asChild>
 																<Button
@@ -373,7 +389,6 @@ export default async function Page({
 															</DialogContent>
 														</Dialog>
 
-														{/* DELETE */}
 														<Dialog>
 															<DialogTrigger asChild>
 																<Button
@@ -423,6 +438,16 @@ export default async function Page({
 						</CardContent>
 					</Card>
 				</main>
+				<PermissionGate require="users:any:read">
+					<div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+						<div className="grid auto-rows-min gap-4 md:grid-cols-3">
+							<div className="aspect-video rounded-xl bg-muted/50" />
+							<div className="aspect-video rounded-xl bg-muted/50" />
+							<div className="aspect-video rounded-xl bg-muted/50" />
+						</div>
+						<div className="min-h-screen flex-1 rounded-xl bg-muted/50 md:min-h-min" />
+					</div>
+				</PermissionGate>
 			</SidebarInset>
 		</SidebarProvider>
 	);

@@ -1,7 +1,7 @@
 import argon2 from "argon2";
 import { eq } from "drizzle-orm";
 import { db } from "@/server/db";
-import { users } from "@/server/db/schema";
+import { roles, userRoles, users } from "@/server/db/schema";
 
 async function main() {
 	const email = process.argv[2];
@@ -35,10 +35,26 @@ async function main() {
 		})
 		.returning();
 
+	const [role] = await db
+		.select()
+		.from(roles)
+		.where(eq(roles.name, "Super Admin"));
+
+	if (!role) {
+		console.error("Role does not exists.");
+		process.exit(1);
+	}
+
+	await db.insert(userRoles).values({
+		userId: created?.id ?? "",
+		roleId: role.id,
+	});
+
 	console.log("Created user: ", {
 		id: created?.id,
 		email: created?.email,
 		name: created?.name,
+		role: role.name,
 	});
 
 	process.exit(0);
