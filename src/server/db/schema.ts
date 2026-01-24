@@ -1,6 +1,23 @@
 import { relations } from "drizzle-orm";
-import { index, pgTableCreator, primaryKey } from "drizzle-orm/pg-core";
+import {
+	foreignKey,
+	index,
+	pgTableCreator,
+	primaryKey,
+	timestamp,
+	unique,
+} from "drizzle-orm/pg-core";
 import type { AdapterAccount } from "next-auth/adapters";
+
+const timestamps = {
+	createdAt: timestamp({ mode: "date", withTimezone: true })
+		.$defaultFn(() => new Date())
+		.notNull(),
+	updatedAt: timestamp({ mode: "date", withTimezone: true })
+		.$defaultFn(() => new Date())
+		.$onUpdateFn(() => new Date())
+		.notNull(),
+};
 
 /**
  * This is an example of how to use the multi-project schema feature of Drizzle ORM. Use the same
@@ -16,7 +33,7 @@ export const posts = createTable(
 		id: d.integer().primaryKey().generatedByDefaultAsIdentity(),
 		name: d.varchar({ length: 256 }),
 		createdById: d
-			.varchar({ length: 255 })
+			.uuid()
 			.notNull()
 			.references(() => users.id),
 		createdAt: d
@@ -33,7 +50,7 @@ export const posts = createTable(
 
 export const users = createTable("user", (d) => ({
 	id: d
-		.varchar({ length: 255 })
+		.uuid()
 		.notNull()
 		.primaryKey()
 		.$defaultFn(() => crypto.randomUUID()),
@@ -52,15 +69,16 @@ export const users = createTable("user", (d) => ({
 
 export const usersRelations = relations(users, ({ many }) => ({
 	accounts: many(accounts),
+	sessions: many(sessions),
+
+	userRoles: many(userRoles),
+	userPermissions: many(userPermissions),
 }));
 
 export const accounts = createTable(
 	"account",
 	(d) => ({
-		userId: d
-			.varchar({ length: 255 })
-			.notNull()
-			.references(() => users.id),
+		userId: d.uuid().notNull(),
 		type: d.varchar({ length: 255 }).$type<AdapterAccount["type"]>().notNull(),
 		provider: d.varchar({ length: 255 }).notNull(),
 		providerAccountId: d.varchar({ length: 255 }).notNull(),
@@ -75,6 +93,11 @@ export const accounts = createTable(
 	(t) => [
 		primaryKey({ columns: [t.provider, t.providerAccountId] }),
 		index("account_user_id_idx").on(t.userId),
+		foreignKey({
+			columns: [t.userId],
+			foreignColumns: [users.id],
+			name: "account_user_id_fk",
+		}).onDelete("cascade"),
 	],
 );
 
@@ -86,13 +109,17 @@ export const sessions = createTable(
 	"session",
 	(d) => ({
 		sessionToken: d.varchar({ length: 255 }).notNull().primaryKey(),
-		userId: d
-			.varchar({ length: 255 })
-			.notNull()
-			.references(() => users.id),
+		userId: d.uuid().notNull(),
 		expires: d.timestamp({ mode: "date", withTimezone: true }).notNull(),
 	}),
-	(t) => [index("t_user_id_idx").on(t.userId)],
+	(t) => [
+		index("t_user_id_idx").on(t.userId),
+		foreignKey({
+			columns: [t.userId],
+			foreignColumns: [users.id],
+			name: "session_user_id_fk",
+		}),
+	],
 );
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
@@ -107,4 +134,157 @@ export const verificationTokens = createTable(
 		expires: d.timestamp({ mode: "date", withTimezone: true }).notNull(),
 	}),
 	(t) => [primaryKey({ columns: [t.identifier, t.token] })],
+);
+
+export const roles = createTable(
+	"role",
+	(d) => ({
+		id: d
+			.uuid()
+			.notNull()
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		name: d.varchar({ length: 255 }).notNull(),
+		description: d.text(),
+		isSystem: d.boolean().default(false).notNull(),
+		...timestamps,
+	}),
+	(t) => [unique("role_name_unique").on(t.name)],
+);
+
+export const rolesRelations = relations(roles, ({ many }) => ({
+	userRoles: many(userRoles),
+	rolePermissions: many(rolePermissions),
+}));
+
+export const permissions = createTable(
+	"permission",
+	(d) => ({
+		id: d
+			.uuid()
+			.notNull()
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		name: d.varchar({ length: 255 }).notNull(),
+		description: d.text(),
+		isDeprecated: d.boolean().default(false).notNull(),
+		...timestamps,
+	}),
+	(t) => [unique("permission_name_unique").on(t.name)],
+);
+
+export const permissionsRelations = relations(permissions, ({ many }) => ({
+	rolePermissions: many(rolePermissions),
+	userPermissions: many(userPermissions),
+}));
+
+export const rolePermissions = createTable(
+	"role_permission",
+	(d) => ({
+		roleId: d.uuid().notNull(),
+		permissionId: d.uuid().notNull(),
+		createdAt: timestamp({ mode: "date", withTimezone: true })
+			.$defaultFn(() => new Date())
+			.notNull(),
+	}),
+	(t) => [
+		primaryKey({ columns: [t.roleId, t.permissionId] }),
+		foreignKey({
+			columns: [t.roleId],
+			foreignColumns: [roles.id],
+			name: "rp_role_id_fk",
+		}),
+		foreignKey({
+			columns: [t.permissionId],
+			foreignColumns: [permissions.id],
+			name: "rp_permission_id_fk",
+		}),
+	],
+);
+
+export const rolePermissionsRelations = relations(
+	rolePermissions,
+	({ one }) => ({
+		role: one(roles, {
+			fields: [rolePermissions.roleId],
+			references: [roles.id],
+		}),
+		permission: one(permissions, {
+			fields: [rolePermissions.permissionId],
+			references: [permissions.id],
+		}),
+	}),
+);
+
+export const userRoles = createTable(
+	"user_role",
+	(d) => ({
+		userId: d.uuid().notNull(),
+		roleId: d.uuid().notNull(),
+		createdAt: timestamp({ mode: "date", withTimezone: true })
+			.$defaultFn(() => new Date())
+			.notNull(),
+	}),
+	(t) => [
+		primaryKey({ columns: [t.userId, t.roleId] }),
+		foreignKey({
+			columns: [t.userId],
+			foreignColumns: [users.id],
+			name: "ur_user_id_fk",
+		}),
+		foreignKey({
+			columns: [t.roleId],
+			foreignColumns: [roles.id],
+			name: "ur_role_id_fk",
+		}),
+	],
+);
+
+export const userRolesRelations = relations(userRoles, ({ one }) => ({
+	user: one(users, {
+		fields: [userRoles.userId],
+		references: [users.id],
+	}),
+	role: one(roles, {
+		fields: [userRoles.roleId],
+		references: [roles.id],
+	}),
+}));
+
+export const userPermissions = createTable(
+	"user_permission",
+	(d) => ({
+		userId: d.uuid().notNull(),
+		permissionId: d.uuid().notNull(),
+		createdAt: timestamp({ mode: "date", withTimezone: true })
+			.$defaultFn(() => new Date())
+			.notNull(),
+	}),
+	(t) => [
+		primaryKey({ columns: [t.userId, t.permissionId] }),
+		foreignKey({
+			columns: [t.userId],
+			foreignColumns: [users.id],
+			name: "up_user_id_fk",
+		}),
+		foreignKey({
+			columns: [t.permissionId],
+			foreignColumns: [permissions.id],
+			name: "up_permission_id_fk",
+		}),
+	],
+);
+
+export const userPermissionsRelations = relations(
+	userPermissions,
+	({ one }) => ({
+		user: one(users, {
+			fields: [userPermissions.userId],
+			references: [users.id],
+		}),
+		permission: one(permissions, {
+			fields: [userPermissions.permissionId],
+			references: [permissions.id],
+		}),
+	}),
 );
