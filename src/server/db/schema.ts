@@ -1,7 +1,16 @@
 import { relations } from "drizzle-orm";
-import { index, pgTableCreator, primaryKey } from "drizzle-orm/pg-core";
+import {
+	index,
+	integer,
+	numeric,
+	pgTable,
+	pgTableCreator,
+	primaryKey,
+	serial,
+	text,
+	timestamp,
+} from "drizzle-orm/pg-core";
 import type { AdapterAccount } from "next-auth/adapters";
-
 /**
  * This is an example of how to use the multi-project schema feature of Drizzle ORM. Use the same
  * database instance for multiple projects.
@@ -108,3 +117,13 @@ export const verificationTokens = createTable(
 	}),
 	(t) => [primaryKey({ columns: [t.identifier, t.token] })],
 );
+export const products = pgTable("ecomercx_product", {
+	id: serial("id").primaryKey(),
+	name: text("name").notNull(),
+	category: text("category").notNull(),
+	price: numeric("price", { precision: 10, scale: 2 }).notNull(),
+	stock: integer("stock").notNull().default(0),
+	salesCount: integer("sales_count").notNull().default(0), // New Column
+	status: text("status").notNull().default("active"),
+	createdAt: timestamp("created_at").defaultNow().notNull(),
+});
