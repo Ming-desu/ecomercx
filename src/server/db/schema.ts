@@ -2,17 +2,11 @@ import { relations } from "drizzle-orm";
 import {
 	foreignKey,
 	index,
-	integer,
-	numeric,
-	pgTable,
 	pgTableCreator,
 	primaryKey,
-	serial,
-	text,
 	timestamp,
 	unique,
 } from "drizzle-orm/pg-core";
-
 import type { AdapterAccount } from "next-auth/adapters";
 
 const timestamps = {
@@ -24,6 +18,7 @@ const timestamps = {
 		.$onUpdateFn(() => new Date())
 		.notNull(),
 };
+
 /**
  * This is an example of how to use the multi-project schema feature of Drizzle ORM. Use the same
  * database instance for multiple projects.
@@ -140,16 +135,6 @@ export const verificationTokens = createTable(
 	}),
 	(t) => [primaryKey({ columns: [t.identifier, t.token] })],
 );
-export const products = pgTable("ecomercx_product", {
-	id: serial("id").primaryKey(),
-	name: text("name").notNull(),
-	category: text("category").notNull(),
-	price: numeric("price", { precision: 10, scale: 2 }).notNull(),
-	stock: integer("stock").notNull().default(0),
-	salesCount: integer("sales_count").notNull().default(0), // New Column
-	status: text("status").notNull().default("active"),
-	createdAt: timestamp("created_at").defaultNow().notNull(),
-});
 
 export const roles = createTable(
 	"role",
@@ -303,3 +288,19 @@ export const userPermissionsRelations = relations(
 		}),
 	}),
 );
+
+export const products = createTable("product", (d) => ({
+	id: d
+		.uuid()
+		.notNull()
+		.primaryKey()
+		.$defaultFn(() => crypto.randomUUID()),
+	name: d.text().notNull(),
+	category: d.text().notNull(),
+	price: d.numeric({ precision: 10, scale: 2 }).notNull(),
+	stock: d.integer().notNull().default(0),
+	salesCount: d.integer().notNull().default(0),
+	status: d.text().notNull().default("active"),
+	image: d.text(), // This column will now be created successfully
+	...timestamps, // Replaces your manual createdAt with your helper logic
+}));

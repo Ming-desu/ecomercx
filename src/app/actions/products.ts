@@ -2,48 +2,62 @@
 
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { uploadImageToB2 } from "@/lib/b2";
 import { db } from "@/server/db";
 import { products } from "@/server/db/schema";
 
-export async function addProduct(formData: FormData) {
-	const name = formData.get("name") as string;
-	const price = formData.get("price") as string;
-	const stock = formData.get("stock") as string;
-	const category = formData.get("category") as string;
+/* =========================
+   ADD PRODUCT
+   ========================= */
+export async function addProduct(formData: FormData): Promise<void> {
+	const imageFile = formData.get("image") as File | null;
 
-	try {
-		await db.insert(products).values({
-			name,
-			price, // Numeric in Drizzle is usually a string to preserve decimals
-			stock: parseInt(stock),
-			category,
-			status: "active",
-		});
+	let imageKey: string | null = null;
 
-		revalidatePath("/dashboard"); // Clears cache so new product shows up
-		return { success: true };
-	} catch (error) {
-		console.error("Failed to add product:", error);
-		return { success: false };
+	if (imageFile && imageFile.size > 0) {
+		imageKey = await uploadImageToB2(imageFile);
 	}
-}
 
-export async function deleteProduct(id: string) {
-	// Convert the string ID from the client to a Number for the DB
-	await db.delete(products).where(eq(products.id, Number(id)));
+	await db.insert(products).values({
+		name: formData.get("name") as string,
+		price: formData.get("price") as string,
+		stock: Number(formData.get("stock")) || 0,
+		category: formData.get("category") as string,
+		image: imageKey,
+		status: "active",
+	});
+
 	revalidatePath("/inventory");
 }
 
-export async function updateProduct(id: string, formData: FormData) {
+/* =========================
+   DELETE PRODUCT
+   ========================= */
+export async function deleteProduct(id: string): Promise<void> {
+	await db.delete(products).where(eq(products.id, id));
+	revalidatePath("/inventory");
+}
+
+/* =========================
+   UPDATE PRODUCT
+   ========================= */
+export async function updateProduct(
+	id: string,
+	formData: FormData,
+): Promise<void> {
 	const name = formData.get("name") as string;
 	const price = formData.get("price") as string;
-	const stock = parseInt(formData.get("stock") as string);
+	const stock = Number(formData.get("stock")) || 0;
 
 	await db
 		.update(products)
-		.set({ name, price, stock })
-		// Convert the string ID to a Number here too
-		.where(eq(products.id, Number(id)));
+		.set({
+			name,
+			price,
+			stock,
+			updatedAt: new Date(),
+		})
+		.where(eq(products.id, id));
 
 	revalidatePath("/inventory");
 }
